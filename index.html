@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG Search</title>
+    <style>
+        :root {
+            --bg-color: #131314;
+            --sidebar-bg: #1e1f20;
+            --input-bg: #1e1f20;
+            --text-primary: #e3e3e3;
+            --text-secondary: #c4c7c5;
+            --accent: #a8c7fa;
+            --border-color: #444746;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Сайдбар */
+        .sidebar {
+            width: 280px;
+            background-color: var(--sidebar-bg);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--border-color);
+        }
+
+        .logo {
+            font-size: 1.2rem;
+            font-weight: 500;
+            margin-bottom: 30px;
+            color: var(--text-primary);
+        }
+
+        .history-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .history-item {
+            padding: 10px;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            cursor: pointer;
+            border-radius: 8px;
+            margin-bottom: 5px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .history-item:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        /* Основная область чата */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .chat-container {
+            flex: 1;
+            padding: 40px 20%;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .message {
+            display: flex;
+            flex-direction: column;
+            max-width: 100%;
+        }
+
+        .message.user {
+            align-items: flex-end;
+        }
+
+        .message.bot {
+            align-items: flex-start;
+        }
+
+        .bubble {
+            padding: 12px 18px;
+            border-radius: 18px;
+            font-size: 1rem;
+            line-height: 1.5;
+            max-width: 85%;
+        }
+
+        .message.user .bubble {
+            background-color: var(--sidebar-bg);
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.bot .bubble {
+            background-color: transparent;
+            padding-left: 0;
+        }
+
+        /* Область ввода */
+        .input-area {
+            padding: 20px 20%;
+            background-color: var(--bg-color);
+        }
+
+        .input-wrapper {
+            background-color: var(--input-bg);
+            border-radius: 24px;
+            padding: 12px 20px;
+            display: flex;
+            align-items: flex-end;
+            gap: 10px;
+            border: 1px solid transparent;
+            transition: border-color 0.2s;
+        }
+
+        .input-wrapper:focus-within {
+            border-color: var(--border-color);
+        }
+
+        textarea {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            font-size: 1rem;
+            resize: none;
+            max-height: 150px;
+            min-height: 24px;
+            outline: none;
+            padding: 4px 0;
+            line-height: 1.5;
+        }
+
+        textarea::placeholder {
+            color: var(--text-secondary);
+        }
+
+        .send-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.2s;
+        }
+
+        .send-btn:hover {
+            color: var(--text-primary);
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        /* Скрываем скроллбары для чистоты, но оставляем функционал */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+    </style>
+</head>
+<body>
+
+    <aside class="sidebar">
+        <div class="logo">✦ RAG Search</div>
+        <div class="history-list">
+            <div class="history-item">Поиск работы техподдержки...</div>
+            <div class="history-item">Парсинг 1С вакансий...</div>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <div class="chat-container" id="chat-box">
+            <!-- Сообщения будут появляться здесь -->
+            <div class="message bot">
+                <div class="bubble">База загружена. Жду запроса для поиска вакансий.</div>
+            </div>
+        </div>
+
+        <div class="input-area">
+            <div class="input-wrapper">
+                <textarea id="user-input" rows="1" placeholder="Введите запрос..."></textarea>
+                <button class="send-btn" id="send-btn">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const chatBox = document.getElementById('chat-box');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+
+        // Авторесайз textarea
+        userInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+        });
+
+        // Отправка по Enter (без Shift)
+        userInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        sendBtn.addEventListener('click', sendMessage);
+
+        async function sendMessage() {
+    const text = userInput.value.trim();
+    if (!text) return;
+
+    // Добавляем сообщение пользователя
+    appendMessage(text, 'user');
+    userInput.value = '';
+    userInput.style.height = 'auto';
+
+    // Пустой пузырь для ответа бота
+    const botBubble = appendMessage('', 'bot');
+
+    try {
+        // 1. Делаем реальный запрос к FastAPI
+        const response = await fetch('/api/search', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ query: text })
+        });
+        
+        // 2. Получаем JSON и достаем из него поле text
+        const data = await response.json();
+        const resultText = data.text;
+
+        // 3. Отправляем реальный ответ в функцию анимации печати
+        typeText(botBubble, resultText);
+
+    } catch (error) {
+        typeText(botBubble, "Ошибка соединения с сервером.");
+    }
+}
+
+        function appendMessage(text, sender) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message ${sender}`;
+            
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble';
+            bubble.textContent = text;
+            
+            msgDiv.appendChild(bubble);
+            chatBox.appendChild(msgDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+            
+            return bubble;
+        }
+
+        // Анимация печати текста
+        function typeText(element, text, speed = 15) {
+            element.textContent = '';
+            let i = 0;
+            
+            function type() {
+                if (i < text.length) {
+                    element.textContent += text.charAt(i);
+                    i++;
+                    chatBox.scrollTop = chatBox.scrollHeight;
+                    setTimeout(type, speed);
+                }
+            }
+            type();
+        }
+    </script>
+</body>
+</html>
