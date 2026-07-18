@@ -27,9 +27,14 @@ async def search_rag(req: QueryRequest):
         n_results=3
     )
     
-    # Формируем текстовый ответ из результатов
-    response_lines = ["Нашел следующие варианты:\n"]
-    for i, meta in enumerate(results['metadatas'][0]):
-        response_lines.append(f"{i+1}. {meta['title']} ({meta['company']})")
+    # Собираем структурированные данные
+    response_data = []
+    for meta in results['metadatas'][0]:
+        response_data.append({
+            "title": meta['title'],
+            "company": meta['company'],
+            "id": meta['vacancy_id']
+        })
         
-    return {"text": "\n".join(response_lines)}
+    # Возвращаем JSON с ключом results
+    return {"results": response_data}

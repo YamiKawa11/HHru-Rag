@@ -7,7 +7,6 @@
     <style>
         :root {
             --bg-color: #131314;
-            --sidebar-bg: #1e1f20;
             --input-bg: #1e1f20;
             --text-primary: #e3e3e3;
             --text-secondary: #c4c7c5;
@@ -28,49 +27,13 @@
             display: flex;
             height: 100vh;
             overflow: hidden;
+            justify-content: center;
         }
 
-        /* Сайдбар */
-        .sidebar {
-            width: 280px;
-            background-color: var(--sidebar-bg);
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            border-right: 1px solid var(--border-color);
-        }
-
-        .logo {
-            font-size: 1.2rem;
-            font-weight: 500;
-            margin-bottom: 30px;
-            color: var(--text-primary);
-        }
-
-        .history-list {
-            flex: 1;
-            overflow-y: auto;
-        }
-
-        .history-item {
-            padding: 10px;
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-            cursor: pointer;
-            border-radius: 8px;
-            margin-bottom: 5px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .history-item:hover {
-            background-color: rgba(255, 255, 255, 0.05);
-        }
-
-        /* Основная область чата */
+        /* Основная область чата (отцентрирована) */
         .main-content {
-            flex: 1;
+            width: 100%;
+            max-width: 900px;
             display: flex;
             flex-direction: column;
             position: relative;
@@ -78,7 +41,7 @@
 
         .chat-container {
             flex: 1;
-            padding: 40px 20%;
+            padding: 40px 20px;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
@@ -108,18 +71,50 @@
         }
 
         .message.user .bubble {
-            background-color: var(--sidebar-bg);
+            background-color: var(--input-bg);
             border-bottom-right-radius: 4px;
         }
 
         .message.bot .bubble {
             background-color: transparent;
             padding-left: 0;
+            white-space: pre-wrap;
+        }
+
+        /* Стили для ссылок и анимации появления */
+        .result-item {
+            margin-top: 12px;
+            padding: 12px;
+            background-color: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            opacity: 0;
+            transform: translateY(10px);
+            animation: fadeUp 0.4s forwards;
+        }
+
+        .result-item a {
+            color: var(--accent);
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 6px;
+            font-size: 0.95rem;
+        }
+
+        .result-item a:hover {
+            text-decoration: underline;
+        }
+
+        @keyframes fadeUp {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         /* Область ввода */
         .input-area {
-            padding: 20px 20%;
+            padding: 20px;
             background-color: var(--bg-color);
         }
 
@@ -166,7 +161,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: color 0.2s;
+            transition: color 0.2s, background-color 0.2s;
         }
 
         .send-btn:hover {
@@ -174,7 +169,6 @@
             background-color: rgba(255, 255, 255, 0.05);
         }
 
-        /* Скрываем скроллбары для чистоты, но оставляем функционал */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
@@ -182,17 +176,8 @@
 </head>
 <body>
 
-    <aside class="sidebar">
-        <div class="logo">✦ RAG Search</div>
-        <div class="history-list">
-            <div class="history-item">Поиск работы техподдержки...</div>
-            <div class="history-item">Парсинг 1С вакансий...</div>
-        </div>
-    </aside>
-
     <main class="main-content">
         <div class="chat-container" id="chat-box">
-            <!-- Сообщения будут появляться здесь -->
             <div class="message bot">
                 <div class="bubble">База загружена. Жду запроса для поиска вакансий.</div>
             </div>
@@ -216,13 +201,11 @@
         const userInput = document.getElementById('user-input');
         const sendBtn = document.getElementById('send-btn');
 
-        // Авторесайз textarea
         userInput.addEventListener('input', function() {
             this.style.height = 'auto';
             this.style.height = (this.scrollHeight) + 'px';
         });
 
-        // Отправка по Enter (без Shift)
         userInput.addEventListener('keydown', function(e) {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -233,36 +216,48 @@
         sendBtn.addEventListener('click', sendMessage);
 
         async function sendMessage() {
-    const text = userInput.value.trim();
-    if (!text) return;
+            const text = userInput.value.trim();
+            if (!text) return;
 
-    // Добавляем сообщение пользователя
-    appendMessage(text, 'user');
-    userInput.value = '';
-    userInput.style.height = 'auto';
+            appendMessage(text, 'user');
+            userInput.value = '';
+            userInput.style.height = 'auto';
 
-    // Пустой пузырь для ответа бота
-    const botBubble = appendMessage('', 'bot');
+            const botBubble = appendMessage('', 'bot');
 
-    try {
-        // 1. Делаем реальный запрос к FastAPI
-        const response = await fetch('/api/search', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ query: text })
-        });
-        
-        // 2. Получаем JSON и достаем из него поле text
-        const data = await response.json();
-        const resultText = data.text;
+            try {
+                const response = await fetch('/api/search', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ query: text })
+                });
+                
+                const data = await response.json();
+                
+                // Печатаем вступительный текст
+                const introText = "Нашел следующие варианты:\n";
+                await typeTextAsync(botBubble, introText);
 
-        // 3. Отправляем реальный ответ в функцию анимации печати
-        typeText(botBubble, resultText);
+                // Отрисовываем результаты с задержкой для красивой анимации
+                data.results.forEach((res, index) => {
+                    const resultDiv = document.createElement('div');
+                    resultDiv.className = 'result-item';
+                    resultDiv.style.animationDelay = `${index * 0.15}s`;
+                    
+                    resultDiv.innerHTML = `
+                        <strong>${res.title}</strong> — ${res.company}<br>
+                        <a href="https://hh.ru/vacancy/${res.id}" target="_blank">↗ Открыть на hh.ru</a>
+                    `;
+                    
+                    botBubble.appendChild(resultDiv);
+                });
+                
+                chatBox.scrollTop = chatBox.scrollHeight;
 
-    } catch (error) {
-        typeText(botBubble, "Ошибка соединения с сервером.");
-    }
-}
+            } catch (error) {
+                await typeTextAsync(botBubble, "Ошибка соединения с сервером.");
+            }
+        }
 
         function appendMessage(text, sender) {
             const msgDiv = document.createElement('div');
@@ -279,20 +274,24 @@
             return bubble;
         }
 
-        // Анимация печати текста
-        function typeText(element, text, speed = 15) {
-            element.textContent = '';
-            let i = 0;
-            
-            function type() {
-                if (i < text.length) {
-                    element.textContent += text.charAt(i);
-                    i++;
-                    chatBox.scrollTop = chatBox.scrollHeight;
-                    setTimeout(type, speed);
+        // Асинхронная функция печати (чтобы дождаться конца текста перед показом карточек)
+        function typeTextAsync(element, text, speed = 15) {
+            return new Promise(resolve => {
+                element.textContent = '';
+                let i = 0;
+                
+                function type() {
+                    if (i < text.length) {
+                        element.textContent += text.charAt(i);
+                        i++;
+                        chatBox.scrollTop = chatBox.scrollHeight;
+                        setTimeout(type, speed);
+                    } else {
+                        resolve();
+                    }
                 }
-            }
-            type();
+                type();
+            });
         }
     </script>
 </body>
